@@ -63,6 +63,21 @@
                 "type": "boolean",
                 "meta": ["with_umi"],
                 "description": "Enable UMI-based read deduplication for this sample. Overrides the global --with_umi param."
+            },
+            "fldMean": {
+                "type": "number",
+                "meta": ["fldMean"],
+                "description": "Mean fragment length for Salmon quantification (single-end only). Passed as --fldMean."
+            },
+            "fldSD": {
+                "type": "number",
+                "meta": ["fldSD"],
+                "description": "Fragment length standard deviation for Salmon quantification (single-end only). Passed as --fldSD."
+            },
+            "noLengthCorrection": {
+                "type": "boolean",
+                "meta": ["noLengthCorrection"],
+                "description": "Apply --noLengthCorrection during Salmon quantification for this sample."
             }
         },
         "required": ["sample", "fastq_1", "strandedness"]
