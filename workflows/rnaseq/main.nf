@@ -136,6 +136,11 @@ workflow RNASEQ {
     // Get inputs for FASTQ and BAM processing paths
 
     ch_fastq = ch_input_branched.fastq
+        .map { meta, reads ->
+            def effective_skip_trimming = meta.containsKey('skip_trimming') ? meta.skip_trimming : params.skip_trimming
+            def effective_with_umi      = meta.containsKey('with_umi')      ? meta.with_umi      : params.with_umi
+            [ meta + [ skip_trimming: effective_skip_trimming, with_umi: effective_with_umi ], reads ]
+        }
     ch_genome_bam = ch_input_branched.bam.map { meta, genome_bam, transcriptome_bam -> [ meta, genome_bam ] }.distinct()
     ch_transcriptome_bam = ch_input_branched.bam.map { meta, genome_bam, transcriptome_bam -> [ meta, transcriptome_bam ] }.distinct()
 
@@ -237,38 +242,47 @@ workflow RNASEQ {
         ch_versions = ch_versions.mix(ALIGN_STAR.out.versions)
 
         //
-        // SUBWORKFLOW: Remove duplicate reads from BAM file based on UMIs
+        // SUBWORKFLOW: Remove duplicate reads from BAM file based on UMIs (per-sample)
         //
-        if (params.with_umi) {
+        ch_genome_bam
+            .join(ch_genome_bam_index, by: [0])
+            .branch { meta, bam, bai ->
+                umi:    meta.with_umi
+                no_umi: true
+            }
+            .set { ch_genome_bam_umi_branch }
 
-            BAM_DEDUP_UMI_STAR(
-                ch_genome_bam.join(ch_genome_bam_index, by: [0]),
-                ch_fasta.map { [ [:], it ] },
-                params.umi_dedup_tool,
-                params.umitools_dedup_stats,
-                params.bam_csi_index,
-                ch_transcriptome_bam,
-                ch_transcript_fasta.map { [ [:], it ] }
-            )
+        BAM_DEDUP_UMI_STAR(
+            ch_genome_bam_umi_branch.umi,
+            ch_fasta.map { [ [:], it ] },
+            params.umi_dedup_tool,
+            params.umitools_dedup_stats,
+            params.bam_csi_index,
+            ch_transcriptome_bam.filter { meta, bam -> meta.with_umi },
+            ch_transcript_fasta.map { [ [:], it ] }
+        )
 
-            ch_genome_bam        = BAM_DEDUP_UMI_STAR.out.bam
-            ch_transcriptome_bam = BAM_DEDUP_UMI_STAR.out.transcriptome_bam
-            ch_genome_bam_index  = BAM_DEDUP_UMI_STAR.out.bai
-            ch_versions          = ch_versions.mix(BAM_DEDUP_UMI_STAR.out.versions)
+        ch_genome_bam        = BAM_DEDUP_UMI_STAR.out.bam
+            .mix(ch_genome_bam_umi_branch.no_umi.map { meta, bam, bai -> [ meta, bam ] })
+        ch_transcriptome_bam = BAM_DEDUP_UMI_STAR.out.transcriptome_bam
+            .mix(ch_transcriptome_bam.filter { meta, bam -> !meta.with_umi })
+        ch_genome_bam_index  = BAM_DEDUP_UMI_STAR.out.bai
+            .mix(ch_genome_bam_umi_branch.no_umi.map { meta, bam, bai -> [ meta, bai ] })
+        ch_versions          = ch_versions.mix(BAM_DEDUP_UMI_STAR.out.versions)
 
-            ch_multiqc_files = ch_multiqc_files
-                .mix(BAM_DEDUP_UMI_STAR.out.multiqc_files)
+        ch_multiqc_files = ch_multiqc_files
+            .mix(BAM_DEDUP_UMI_STAR.out.multiqc_files)
 
-        } else if (params.skip_markduplicates) {
+        // For non-UMI samples when markdups is skipped, add aligner stats to MultiQC
+        if (params.skip_markduplicates) {
             // The deduplicated stats should take priority for MultiQC, but use
             // them straight out of the aligner otherwise. If mark duplicates
             // will run, those stats will be added later instead to avoid
             // duplicate flagstat files in MultiQC.
-
             ch_multiqc_files = ch_multiqc_files
-                .mix(ALIGN_STAR.out.stats.collect{it[1]})
-                .mix(ALIGN_STAR.out.flagstat.collect{it[1]})
-                .mix(ALIGN_STAR.out.idxstats.collect{it[1]})
+                .mix(ALIGN_STAR.out.stats.filter    { meta, f -> !meta.with_umi }.collect{it[1]})
+                .mix(ALIGN_STAR.out.flagstat.filter { meta, f -> !meta.with_umi }.collect{it[1]})
+                .mix(ALIGN_STAR.out.idxstats.filter { meta, f -> !meta.with_umi }.collect{it[1]})
         }
     }
 
@@ -345,37 +359,46 @@ workflow RNASEQ {
         ch_versions = ch_versions.mix(FASTQ_ALIGN_HISAT2.out.versions)
 
         //
-        // SUBWORKFLOW: Remove duplicate reads from BAM file based on UMIs
+        // SUBWORKFLOW: Remove duplicate reads from BAM file based on UMIs (per-sample)
         //
 
-        if (params.with_umi) {
+        ch_genome_bam
+            .join(ch_genome_bam_index, by: [0])
+            .branch { meta, bam, bai ->
+                umi:    meta.with_umi
+                no_umi: true
+            }
+            .set { ch_genome_bam_hisat2_umi_branch }
 
-            BAM_DEDUP_UMI_HISAT2(
-                ch_genome_bam.join(ch_genome_bam_index, by: [0]),
-                ch_fasta.map { [ [:], it ] },
-                params.umi_dedup_tool,
-                params.umitools_dedup_stats,
-                params.bam_csi_index,
-                ch_transcriptome_bam,
-                ch_transcript_fasta.map { [ [:], it ] }
-            )
+        BAM_DEDUP_UMI_HISAT2(
+            ch_genome_bam_hisat2_umi_branch.umi,
+            ch_fasta.map { [ [:], it ] },
+            params.umi_dedup_tool,
+            params.umitools_dedup_stats,
+            params.bam_csi_index,
+            ch_transcriptome_bam.filter { meta, bam -> meta.with_umi },
+            ch_transcript_fasta.map { [ [:], it ] }
+        )
 
-            ch_genome_bam        = BAM_DEDUP_UMI_HISAT2.out.bam
-            ch_genome_bam_index  = BAM_DEDUP_UMI_HISAT2.out.bai
-            ch_versions          = ch_versions.mix(BAM_DEDUP_UMI_HISAT2.out.versions)
+        ch_genome_bam       = BAM_DEDUP_UMI_HISAT2.out.bam
+            .mix(ch_genome_bam_hisat2_umi_branch.no_umi.map { meta, bam, bai -> [ meta, bam ] })
+        ch_genome_bam_index = BAM_DEDUP_UMI_HISAT2.out.bai
+            .mix(ch_genome_bam_hisat2_umi_branch.no_umi.map { meta, bam, bai -> [ meta, bai ] })
+        ch_versions         = ch_versions.mix(BAM_DEDUP_UMI_HISAT2.out.versions)
 
-            ch_multiqc_files = ch_multiqc_files
-                .mix(BAM_DEDUP_UMI_HISAT2.out.multiqc_files)
-        } else if (params.skip_markduplicates) {
+        ch_multiqc_files = ch_multiqc_files
+            .mix(BAM_DEDUP_UMI_HISAT2.out.multiqc_files)
 
+        // For non-UMI samples when markdups is skipped, add aligner stats to MultiQC
+        if (params.skip_markduplicates) {
             // The deduplicated stats should take priority for MultiQC, but use
             // them straight out of the aligner otherwise. If mark duplicates
             // will run, those stats will be added later instead to avoid
             // duplicate flagstat files in MultiQC.
             ch_multiqc_files = ch_multiqc_files
-                .mix(FASTQ_ALIGN_HISAT2.out.stats.collect{it[1]})
-                .mix(FASTQ_ALIGN_HISAT2.out.flagstat.collect{it[1]})
-                .mix(FASTQ_ALIGN_HISAT2.out.idxstats.collect{it[1]})
+                .mix(FASTQ_ALIGN_HISAT2.out.stats.filter    { meta, f -> !meta.with_umi }.collect{it[1]})
+                .mix(FASTQ_ALIGN_HISAT2.out.flagstat.filter { meta, f -> !meta.with_umi }.collect{it[1]})
+                .mix(FASTQ_ALIGN_HISAT2.out.idxstats.filter { meta, f -> !meta.with_umi }.collect{it[1]})
         }
     }
 
@@ -444,14 +467,18 @@ workflow RNASEQ {
     //
     // SUBWORKFLOW: Mark duplicate reads
     //
-    if (!params.skip_markduplicates && !params.with_umi) {
+    if (!params.skip_markduplicates) {
+        // Run MarkDuplicates only on samples that did NOT use UMI deduplication
         BAM_MARKDUPLICATES_PICARD (
-            ch_genome_bam,
+            ch_genome_bam.filter { meta, bam -> !meta.with_umi },
             ch_fasta.map { [ [:], it ] },
             ch_fai.map { [ [:], it ] }
         )
+        // Mix MarkDup'd BAMs back with UMI-dedup'd BAMs
         ch_genome_bam       = BAM_MARKDUPLICATES_PICARD.out.bam
-        ch_genome_bam_index = params.bam_csi_index ? BAM_MARKDUPLICATES_PICARD.out.csi : BAM_MARKDUPLICATES_PICARD.out.bai
+            .mix(ch_genome_bam.filter { meta, bam -> meta.with_umi })
+        ch_genome_bam_index = (params.bam_csi_index ? BAM_MARKDUPLICATES_PICARD.out.csi : BAM_MARKDUPLICATES_PICARD.out.bai)
+            .mix(ch_genome_bam_index.filter { meta, idx -> meta.with_umi })
         ch_multiqc_files = ch_multiqc_files.mix(BAM_MARKDUPLICATES_PICARD.out.stats.collect{it[1]})
         ch_multiqc_files = ch_multiqc_files.mix(BAM_MARKDUPLICATES_PICARD.out.flagstat.collect{it[1]})
         ch_multiqc_files = ch_multiqc_files.mix(BAM_MARKDUPLICATES_PICARD.out.idxstats.collect{it[1]})

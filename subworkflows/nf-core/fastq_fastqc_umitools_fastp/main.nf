@@ -73,66 +73,80 @@ workflow FASTQ_FASTQC_UMITOOLS_FASTP {
     }
 
     umi_reads = reads
-    if (with_umi && !skip_umi_extract) {
-        UMITOOLS_EXTRACT(
-            reads
-        )
-        umi_reads = UMITOOLS_EXTRACT.out.reads
-        umi_log = UMITOOLS_EXTRACT.out.log
+
+    if (!skip_umi_extract) {
+        // Branch by per-sample with_umi (meta value overrides scalar param)
+        reads
+            .branch { meta, r ->
+                extract: (meta.containsKey('with_umi') ? meta.with_umi : with_umi)
+                pass:    true
+            }
+            .set { ch_reads_umi_branch }
+
+        UMITOOLS_EXTRACT(ch_reads_umi_branch.extract)
+        umi_log     = UMITOOLS_EXTRACT.out.log
         ch_versions = ch_versions.mix(UMITOOLS_EXTRACT.out.versions.first())
 
-        // Discard R1 / R2 if required
+        // Handle umi_discard_read for UMI-extracted samples
+        ch_umi_extracted = UMITOOLS_EXTRACT.out.reads
         if (umi_discard_read in [1, 2]) {
-            UMITOOLS_EXTRACT.out.reads
-                .map { meta, _reads ->
-                    meta.single_end ? [meta, _reads] : [meta + [single_end: true], _reads[umi_discard_read % 2]]
-                }
-                .set { umi_reads }
+            ch_umi_extracted = ch_umi_extracted.map { meta, _reads ->
+                meta.single_end ? [meta, _reads] : [meta + [single_end: true], _reads[umi_discard_read % 2]]
+            }
         }
+        umi_reads = ch_umi_extracted.mix(ch_reads_umi_branch.pass)
     }
 
     trim_reads = umi_reads
-    if (!skip_trimming) {
-        FASTP(
-            umi_reads,
-            adapter_fasta,
-            false,
-            save_trimmed_fail,
-            save_merged,
-        )
-        trim_json = FASTP.out.json
-        trim_html = FASTP.out.html
-        trim_log = FASTP.out.log
-        trim_reads_fail = FASTP.out.reads_fail
-        trim_reads_merged = FASTP.out.reads_merged
-        ch_versions = ch_versions.mix(FASTP.out.versions.first())
 
-        //
-        // Filter FastQ files based on minimum trimmed read count after adapter trimming
-        //
-        FASTP.out.reads.join(trim_json).map { meta, _reads, json -> [meta, _reads, getFastpReadsAfterFiltering(json, min_trimmed_reads.toLong())] }.set { ch_num_trimmed_reads }
-
-        ch_num_trimmed_reads
-            .filter { _meta, _reads, num_reads -> num_reads >= min_trimmed_reads.toLong() }
-            .map { meta, _reads, _num_reads -> [meta, _reads] }
-            .set { trim_reads }
-
-        ch_num_trimmed_reads
-            .map { meta, _reads, num_reads -> [meta, num_reads] }
-            .set { trim_read_count }
-
-        trim_json
-            .map { meta, json -> [meta, getFastpAdapterSequence(json)] }
-            .set { adapter_seq }
-
-        if (!skip_fastqc) {
-            FASTQC_TRIM(
-                trim_reads
-            )
-            fastqc_trim_html = FASTQC_TRIM.out.html
-            fastqc_trim_zip = FASTQC_TRIM.out.zip
-            ch_versions = ch_versions.mix(FASTQC_TRIM.out.versions.first())
+    // Branch by per-sample skip_trimming (meta value overrides scalar param)
+    umi_reads
+        .branch { meta, r ->
+            trim: !(meta.containsKey('skip_trimming') ? meta.skip_trimming : skip_trimming)
+            skip: true
         }
+        .set { ch_umi_reads_branch }
+
+    FASTP(
+        ch_umi_reads_branch.trim,
+        adapter_fasta,
+        false,
+        save_trimmed_fail,
+        save_merged,
+    )
+    trim_json = FASTP.out.json
+    trim_html = FASTP.out.html
+    trim_log = FASTP.out.log
+    trim_reads_fail = FASTP.out.reads_fail
+    trim_reads_merged = FASTP.out.reads_merged
+    ch_versions = ch_versions.mix(FASTP.out.versions.first())
+
+    //
+    // Filter FastQ files based on minimum trimmed read count after adapter trimming
+    //
+    FASTP.out.reads.join(trim_json).map { meta, _reads, json -> [meta, _reads, getFastpReadsAfterFiltering(json, min_trimmed_reads.toLong())] }.set { ch_num_trimmed_reads }
+
+    ch_num_trimmed_reads
+        .filter { _meta, _reads, num_reads -> num_reads >= min_trimmed_reads.toLong() }
+        .map { meta, _reads, _num_reads -> [meta, _reads] }
+        .mix(ch_umi_reads_branch.skip)
+        .set { trim_reads }
+
+    ch_num_trimmed_reads
+        .map { meta, _reads, num_reads -> [meta, num_reads] }
+        .set { trim_read_count }
+
+    trim_json
+        .map { meta, json -> [meta, getFastpAdapterSequence(json)] }
+        .set { adapter_seq }
+
+    if (!skip_fastqc) {
+        FASTQC_TRIM(
+            trim_reads
+        )
+        fastqc_trim_html = FASTQC_TRIM.out.html
+        fastqc_trim_zip = FASTQC_TRIM.out.zip
+        ch_versions = ch_versions.mix(FASTQC_TRIM.out.versions.first())
     }
 
     emit:

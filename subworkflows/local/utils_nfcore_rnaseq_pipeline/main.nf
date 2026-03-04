@@ -203,6 +203,22 @@ def checkSamplesAfterGrouping(input) {
         error("Please check input samplesheet -> Multiple runs of a sample must be of the same datatype i.e. single-end or paired-end: ${metas[0].id}")
     }
 
+    // Check that multiple runs of the same sample have a consistent skip_trimming setting
+    if (metas.any { it.containsKey('skip_trimming') }) {
+        def skip_trimming_values = metas.collect { it.skip_trimming }.unique()
+        if (skip_trimming_values.size() > 1) {
+            error("Please check input samplesheet -> Multiple runs of a sample must have the same skip_trimming setting: ${metas[0].id}")
+        }
+    }
+
+    // Check that multiple runs of the same sample have a consistent with_umi setting
+    if (metas.any { it.containsKey('with_umi') }) {
+        def with_umi_values = metas.collect { it.with_umi }.unique()
+        if (with_umi_values.size() > 1) {
+            error("Please check input samplesheet -> Multiple runs of a sample must have the same with_umi setting: ${metas[0].id}")
+        }
+    }
+
     // Return format depends on whether BAM data was provided
     if (genome_bams != null || transcriptome_bams != null) {
         def genome_bam = genome_bams?.find { it != null }

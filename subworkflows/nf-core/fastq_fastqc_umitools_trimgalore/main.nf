@@ -48,20 +48,28 @@ workflow FASTQ_FASTQC_UMITOOLS_TRIMGALORE {
 
     umi_reads = reads
     umi_log = Channel.empty()
-    if (with_umi && !skip_umi_extract) {
-        UMITOOLS_EXTRACT(reads)
-        umi_reads = UMITOOLS_EXTRACT.out.reads
-        umi_log = UMITOOLS_EXTRACT.out.log
+
+    if (!skip_umi_extract) {
+        // Branch by per-sample with_umi (meta value overrides scalar param)
+        reads
+            .branch { meta, r ->
+                extract: (meta.containsKey('with_umi') ? meta.with_umi : with_umi)
+                pass:    true
+            }
+            .set { ch_reads_umi_branch }
+
+        UMITOOLS_EXTRACT(ch_reads_umi_branch.extract)
+        umi_log     = UMITOOLS_EXTRACT.out.log
         ch_versions = ch_versions.mix(UMITOOLS_EXTRACT.out.versions.first())
 
-        // Discard R1 / R2 if required
+        // Handle umi_discard_read for UMI-extracted samples
+        ch_umi_extracted = UMITOOLS_EXTRACT.out.reads
         if (umi_discard_read in [1, 2]) {
-            UMITOOLS_EXTRACT.out.reads
-                .map { meta, reads ->
-                    meta.single_end ? [meta, reads] : [meta + ['single_end': true], reads[umi_discard_read % 2]]
-                }
-                .set { umi_reads }
+            ch_umi_extracted = ch_umi_extracted.map { meta, r ->
+                meta.single_end ? [meta, r] : [meta + ['single_end': true], r[umi_discard_read % 2]]
+            }
         }
+        umi_reads = ch_umi_extracted.mix(ch_reads_umi_branch.pass)
     }
 
     trim_reads = umi_reads
@@ -70,39 +78,47 @@ workflow FASTQ_FASTQC_UMITOOLS_TRIMGALORE {
     trim_zip = Channel.empty()
     trim_log = Channel.empty()
     trim_read_count = Channel.empty()
-    if (!skip_trimming) {
-        TRIMGALORE(umi_reads)
-        trim_unpaired = TRIMGALORE.out.unpaired
-        trim_html = TRIMGALORE.out.html
-        trim_zip = TRIMGALORE.out.zip
-        trim_log = TRIMGALORE.out.log
-        ch_versions = ch_versions.mix(TRIMGALORE.out.versions.first())
 
-        //
-        // Filter FastQ files based on minimum trimmed read count after adapter trimming
-        //
-        TRIMGALORE.out.reads
-            .join(trim_log, remainder: true)
-            .map { meta, reads_, trim_log_ ->
-                if (trim_log) {
-                    def num_reads = getTrimGaloreReadsAfterFiltering(meta.single_end ? trim_log_ : trim_log_[-1])
-                    [meta, reads_, num_reads]
-                }
-                else {
-                    [meta, reads, min_trimmed_reads.toFloat() + 1]
-                }
+    // Branch by per-sample skip_trimming (meta value overrides scalar param)
+    umi_reads
+        .branch { meta, r ->
+            trim: !(meta.containsKey('skip_trimming') ? meta.skip_trimming : skip_trimming)
+            skip: true
+        }
+        .set { ch_umi_reads_branch }
+
+    TRIMGALORE(ch_umi_reads_branch.trim)
+    trim_unpaired = TRIMGALORE.out.unpaired
+    trim_html     = TRIMGALORE.out.html
+    trim_zip      = TRIMGALORE.out.zip
+    trim_log      = TRIMGALORE.out.log
+    ch_versions   = ch_versions.mix(TRIMGALORE.out.versions.first())
+
+    //
+    // Filter FastQ files based on minimum trimmed read count after adapter trimming
+    //
+    TRIMGALORE.out.reads
+        .join(trim_log, remainder: true)
+        .map { meta, reads_, trim_log_ ->
+            if (trim_log_) {
+                def num_reads = getTrimGaloreReadsAfterFiltering(meta.single_end ? trim_log_ : trim_log_[-1])
+                [meta, reads_, num_reads]
             }
-            .set { ch_num_trimmed_reads }
+            else {
+                [meta, reads_, min_trimmed_reads.toFloat() + 1]
+            }
+        }
+        .set { ch_num_trimmed_reads }
 
-        ch_num_trimmed_reads
-            .filter { _meta, _reads, num_reads -> num_reads >= min_trimmed_reads.toFloat() }
-            .map { meta, reads_, _num_reads -> [meta, reads_] }
-            .set { trim_reads }
+    ch_num_trimmed_reads
+        .filter { _meta, _reads, num_reads -> num_reads >= min_trimmed_reads.toFloat() }
+        .map { meta, reads_, _num_reads -> [meta, reads_] }
+        .mix(ch_umi_reads_branch.skip)
+        .set { trim_reads }
 
-        ch_num_trimmed_reads
-            .map { meta, _reads, num_reads -> [meta, num_reads] }
-            .set { trim_read_count }
-    }
+    ch_num_trimmed_reads
+        .map { meta, _reads, num_reads -> [meta, num_reads] }
+        .set { trim_read_count }
 
     emit:
     reads           = trim_reads // channel: [ val(meta), [ reads ] ]

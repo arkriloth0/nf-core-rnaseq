@@ -53,6 +53,16 @@
                 "maximum": 100,
                 "errorMessage": "Percent mapped must be a number between 0 and 100",
                 "meta": "percent_mapped"
+            },
+            "skip_trimming": {
+                "type": "boolean",
+                "meta": ["skip_trimming"],
+                "description": "Skip adapter trimming for this sample. Overrides the global --skip_trimming param."
+            },
+            "with_umi": {
+                "type": "boolean",
+                "meta": ["with_umi"],
+                "description": "Enable UMI-based read deduplication for this sample. Overrides the global --with_umi param."
             }
         },
         "required": ["sample", "fastq_1", "strandedness"]
