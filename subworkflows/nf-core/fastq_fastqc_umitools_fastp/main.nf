@@ -94,9 +94,17 @@ workflow FASTQ_FASTQC_UMITOOLS_FASTP {
 
     trim_reads = trimmer_reads
     if (!skip_trimming) {
+        // Branch by per-sample skip_trimming (meta value overrides scalar param)
+        trimmer_reads
+            .branch { meta, r ->
+                trim: !(meta.containsKey('skip_trimming') ? meta.skip_trimming : false)
+                skip: true
+            }
+            .set { ch_trimmer_reads_branch }
+
         // Rejoin trimmer_reads with adapter info from original input
         // Use ID-based join to handle metadata modifications from UMI processing
-        umi_reads_with_adapters = trimmer_reads
+        umi_reads_with_adapters = ch_trimmer_reads_branch.trim
             .map { meta, reads_files -> [meta.id, meta, reads_files] }
             .join(
                 reads.map { meta, _original_reads, adapter_fasta -> [meta.id, adapter_fasta ?: []] }
@@ -123,6 +131,7 @@ workflow FASTQ_FASTQC_UMITOOLS_FASTP {
         ch_num_trimmed_reads
             .filter { _meta, _reads, num_reads -> num_reads >= min_trimmed_reads.toLong() }
             .map { meta, _reads, _num_reads -> [meta, _reads] }
+            .mix(ch_trimmer_reads_branch.skip)
             .set { trim_reads }
 
         ch_num_trimmed_reads
