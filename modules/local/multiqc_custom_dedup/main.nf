@@ -7,7 +7,8 @@ process MULTIQC_CUSTOM_DEDUP {
         'biocontainers/python:3.9--1' }"
 
     input:
-    path dedup_logs
+    path pre_flagstats, stageAs: 'pre/*'
+    path post_flagstats, stageAs: 'post/*'
     path header
 
     output:
@@ -20,86 +21,56 @@ process MULTIQC_CUSTOM_DEDUP {
     script:
     """
     python3 - << 'PYEOF'
-import glob, os, re, sys
-
-header    = '${header}'
-log_files = glob.glob('*_dedup*.log') + glob.glob('*.dedup*.log')
-if not log_files:
-    log_files = [f for f in os.listdir('.') if f.endswith('.log')]
+import os, re, sys
 
 
-def parse_umitools_log(content):
-    reads_in  = None
-    reads_out = None
-    for line in content.splitlines():
-        m = re.search(r'Reads: Input Reads:\\s+(\\d+)', line)
-        if m:
-            reads_in = int(m.group(1))
-        m = re.search(r'Number of reads out:\\s+(\\d+)', line)
-        if m:
-            reads_out = int(m.group(1))
-    return reads_in, reads_out
+def parse_primary_mapped(flagstat_file):
+    with open(flagstat_file) as fh:
+        for line in fh:
+            if 'primary mapped' in line:
+                m = re.match(r'(\\d+)', line)
+                if m:
+                    return int(m.group(1))
+    return None
 
 
-def parse_umicollapse_log(content):
-    reads_in  = None
-    reads_out = None
-    for line in content.splitlines():
-        m = re.search(r'Total reads:\\s*([\\d,]+),\\s*reads output:\\s*([\\d,]+)', line, re.IGNORECASE)
-        if m:
-            reads_in  = int(m.group(1).replace(',', ''))
-            reads_out = int(m.group(2).replace(',', ''))
-            break
-        m = re.search(r'Number of input reads\\s+([\\d,]+)', line, re.IGNORECASE)
-        if m and reads_in is None:
-            reads_in = int(m.group(1).replace(',', ''))
-        m = re.search(r'Number of reads after deduplicat\\w*\\s+([\\d,]+)', line, re.IGNORECASE)
-        if m and reads_out is None:
-            reads_out = int(m.group(1).replace(',', ''))
-        m = re.search(r'Total input[^:]*:\\s*([\\d,]+)', line, re.IGNORECASE)
-        if m and reads_in is None:
-            reads_in = int(m.group(1).replace(',', ''))
-        m = re.search(r'Total output[^:]*:\\s*([\\d,]+)', line, re.IGNORECASE)
-        if m and reads_out is None:
-            reads_out = int(m.group(1).replace(',', ''))
-        m = re.search(r'Reads written[^:]*:\\s*([\\d,]+)\\s+of\\s+([\\d,]+)', line, re.IGNORECASE)
-        if m:
-            reads_out = int(m.group(1).replace(',', ''))
-            reads_in  = int(m.group(2).replace(',', ''))
-            break
-    return reads_in, reads_out
-
-
-def sample_id_from_filename(fname):
+def sample_id_from_flagstat(fname):
     name = os.path.basename(fname)
-    name = re.sub(r'\\.umi_dedup\\..*', '', name)
-    name = re.sub(r'\\.log\$', '', name)
+    name = re.sub(r'\\.sorted\\.bam\\.flagstat', '', name)
+    name = re.sub(r'\\.flagstat', '', name)
     return name
 
 
-with open(header) as fh:
+pre_dir  = 'pre'
+post_dir = 'post'
+
+pre_files  = {sample_id_from_flagstat(f): os.path.join(pre_dir, f)
+              for f in os.listdir(pre_dir) if f.endswith('.flagstat')}
+post_files = {sample_id_from_flagstat(f): os.path.join(post_dir, f)
+              for f in os.listdir(post_dir) if f.endswith('.flagstat')}
+
+samples = sorted(set(pre_files) & set(post_files))
+if not samples:
+    sys.exit(
+        'ERROR: No matching samples found between pre-dedup ('
+        + str(sorted(pre_files)) + ') and post-dedup ('
+        + str(sorted(post_files)) + ') flagstat files.'
+    )
+
+with open('${header}') as fh:
     header_text = fh.read()
 
 rows = []
-for log_file in sorted(log_files):
-    with open(log_file) as fh:
-        content = fh.read()
-
-    if '_UMICollapse.log' in log_file:
-        reads_in, reads_out = parse_umicollapse_log(content)
-    else:
-        reads_in, reads_out = parse_umitools_log(content)
-
-    if reads_in is None or reads_out is None:
+for sample in samples:
+    pre_count  = parse_primary_mapped(pre_files[sample])
+    post_count = parse_primary_mapped(post_files[sample])
+    if pre_count is None or post_count is None:
         sys.exit(
-            'ERROR: Could not parse reads_in (' + str(reads_in) + ') or reads_out ('
-            + str(reads_out) + ') from ' + log_file
-            + '. Please report this at https://github.com/nf-core/rnaseq/issues'
+            'ERROR: Could not parse primary mapped reads for sample '
+            + sample + ' (pre=' + str(pre_count) + ', post=' + str(post_count) + ')'
         )
-
-    sample_id = sample_id_from_filename(log_file)
-    dup_reads = reads_in - reads_out
-    rows.append(sample_id + '\\t' + str(reads_out) + '\\t' + str(dup_reads))
+    dup_reads = pre_count - post_count
+    rows.append(sample + '\\t' + str(post_count) + '\\t' + str(dup_reads))
 
 with open('umi_dedup_genome_mqc.tsv', 'w') as fh:
     fh.write(header_text)

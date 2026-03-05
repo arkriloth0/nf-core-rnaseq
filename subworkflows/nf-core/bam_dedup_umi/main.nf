@@ -127,6 +127,7 @@ workflow BAM_DEDUP_UMI {
     bai                    = bam_csi_index ? UMI_DEDUP_GENOME.out.csi : UMI_DEDUP_GENOME.out.bai     // channel: [ val(meta), path(bai) ]
     dedup_log              = ch_dedup_log                                                            // channel: [ val(meta), path(log) ] genome only
     transcriptome_dedup_log = ch_transcriptome_dedup_log                                            // channel: [ val(meta), path(log) ]
+    genome_flagstat    = UMI_DEDUP_GENOME.out.flagstat                                              // channel: [ val(meta), path(flagstat) ]
     stats              = UMI_DEDUP_GENOME.out.stats.mix(UMI_DEDUP_TRANSCRIPTOME.out.stats)       // channel: [ val(meta), path(stats)]
     flagstat           = UMI_DEDUP_GENOME.out.flagstat.mix(UMI_DEDUP_TRANSCRIPTOME.out.flagstat) // channel: [ val(meta), path(flagstat)]
     idxstats           = UMI_DEDUP_GENOME.out.idxstats.mix(UMI_DEDUP_TRANSCRIPTOME.out.idxstats) // channel: [ val(meta), path(idxstats)]
