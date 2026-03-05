@@ -283,7 +283,7 @@ workflow RNASEQ {
         // MODULE: Custom MultiQC plot — genome BAM deduplication rate
         //
         MULTIQC_CUSTOM_DEDUP_STAR (
-            BAM_DEDUP_UMI_STAR.out.genome_dedup_log.collect{it[1]},
+            BAM_DEDUP_UMI_STAR.out.dedup_log.collect{it[1]},
             ch_dedup_genome_header_mqc
         )
         ch_multiqc_files = ch_multiqc_files.mix(MULTIQC_CUSTOM_DEDUP_STAR.out.tsv)
@@ -439,7 +439,7 @@ workflow RNASEQ {
         // MODULE: Custom MultiQC plot — genome BAM deduplication rate
         //
         MULTIQC_CUSTOM_DEDUP_HISAT2 (
-            BAM_DEDUP_UMI_HISAT2.out.genome_dedup_log.collect{it[1]},
+            BAM_DEDUP_UMI_HISAT2.out.dedup_log.collect{it[1]},
             ch_dedup_genome_header_mqc
         )
         ch_multiqc_files = ch_multiqc_files.mix(MULTIQC_CUSTOM_DEDUP_HISAT2.out.tsv)

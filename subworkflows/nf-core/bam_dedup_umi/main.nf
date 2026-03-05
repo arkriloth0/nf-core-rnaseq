@@ -35,7 +35,6 @@ workflow BAM_DEDUP_UMI {
         )
         UMI_DEDUP_GENOME = BAM_DEDUP_STATS_SAMTOOLS_UMICOLLAPSE_GENOME
         ch_dedup_log = UMI_DEDUP_GENOME.out.dedup_stats
-        ch_genome_dedup_log = UMI_DEDUP_GENOME.out.dedup_stats
 
     } else if (umi_dedup_tool == "umitools") {
         BAM_DEDUP_STATS_SAMTOOLS_UMITOOLS_GENOME (
@@ -44,7 +43,6 @@ workflow BAM_DEDUP_UMI {
         )
         UMI_DEDUP_GENOME = BAM_DEDUP_STATS_SAMTOOLS_UMITOOLS_GENOME
         ch_dedup_log = UMI_DEDUP_GENOME.out.deduplog
-        ch_genome_dedup_log = UMI_DEDUP_GENOME.out.deduplog
     }
 
     // Transcriptome dedup log emitted separately so callers can generate
@@ -70,7 +68,6 @@ workflow BAM_DEDUP_UMI {
             ch_sorted_transcriptome_bam
         )
         UMI_DEDUP_TRANSCRIPTOME = BAM_DEDUP_STATS_SAMTOOLS_UMICOLLAPSE_TRANSCRIPTOME
-        ch_dedup_log = ch_dedup_log.mix(UMI_DEDUP_TRANSCRIPTOME.out.dedup_stats)
         ch_transcriptome_dedup_log = UMI_DEDUP_TRANSCRIPTOME.out.dedup_stats
 
     } else if (umi_dedup_tool == "umitools") {
@@ -79,7 +76,6 @@ workflow BAM_DEDUP_UMI {
             umitools_dedup_stats
         )
         UMI_DEDUP_TRANSCRIPTOME = BAM_DEDUP_STATS_SAMTOOLS_UMITOOLS_TRANSCRIPTOME
-        ch_dedup_log = ch_dedup_log.mix(UMI_DEDUP_TRANSCRIPTOME.out.deduplog)
         ch_transcriptome_dedup_log = UMI_DEDUP_TRANSCRIPTOME.out.deduplog
     }
 
@@ -129,8 +125,7 @@ workflow BAM_DEDUP_UMI {
     emit:
     bam                    = UMI_DEDUP_GENOME.out.bam                                                // channel: [ val(meta), path(bam) ]
     bai                    = bam_csi_index ? UMI_DEDUP_GENOME.out.csi : UMI_DEDUP_GENOME.out.bai     // channel: [ val(meta), path(bai) ]
-    dedup_log              = ch_dedup_log                                                            // channel: [ val(meta), path(log) ]
-    genome_dedup_log       = ch_genome_dedup_log                                                    // channel: [ val(meta), path(log) ]
+    dedup_log              = ch_dedup_log                                                            // channel: [ val(meta), path(log) ] genome only
     transcriptome_dedup_log = ch_transcriptome_dedup_log                                            // channel: [ val(meta), path(log) ]
     stats              = UMI_DEDUP_GENOME.out.stats.mix(UMI_DEDUP_TRANSCRIPTOME.out.stats)       // channel: [ val(meta), path(stats)]
     flagstat           = UMI_DEDUP_GENOME.out.flagstat.mix(UMI_DEDUP_TRANSCRIPTOME.out.flagstat) // channel: [ val(meta), path(flagstat)]
