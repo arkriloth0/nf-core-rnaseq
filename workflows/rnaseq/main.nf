@@ -81,7 +81,7 @@ ch_pca_header_multiqc              = file("$projectDir/workflows/rnaseq/assets/m
 sample_status_header_multiqc       = file("$projectDir/workflows/rnaseq/assets/multiqc/sample_status_header.txt", checkIfExists: true)
 ch_clustering_header_multiqc       = file("$projectDir/workflows/rnaseq/assets/multiqc/deseq2_clustering_header.txt", checkIfExists: true)
 ch_biotypes_header_multiqc         = file("$projectDir/workflows/rnaseq/assets/multiqc/biotypes_header.txt", checkIfExists: true)
-ch_dedup_transcriptome_header_mqc  = file("$projectDir/workflows/rnaseq/assets/multiqc/umi_dedup_transcriptome_header.txt", checkIfExists: true)
+ch_dedup_genome_header_mqc         = file("$projectDir/workflows/rnaseq/assets/multiqc/umi_dedup_genome_header.txt", checkIfExists: true)
 ch_dummy_file                      = ch_pca_header_multiqc
 
 workflow RNASEQ {
@@ -280,11 +280,11 @@ workflow RNASEQ {
             .mix(BAM_DEDUP_UMI_STAR.out.multiqc_files)
 
         //
-        // MODULE: Custom MultiQC plot — transcriptome BAM deduplication rate
+        // MODULE: Custom MultiQC plot — genome BAM deduplication rate
         //
         MULTIQC_CUSTOM_DEDUP_STAR (
-            BAM_DEDUP_UMI_STAR.out.transcriptome_dedup_log,
-            ch_dedup_transcriptome_header_mqc
+            BAM_DEDUP_UMI_STAR.out.dedup_log,
+            ch_dedup_genome_header_mqc
         )
         ch_multiqc_files = ch_multiqc_files.mix(MULTIQC_CUSTOM_DEDUP_STAR.out.tsv.collect{it[1]})
         ch_versions = ch_versions.mix(MULTIQC_CUSTOM_DEDUP_STAR.out.versions.first())
@@ -436,11 +436,11 @@ workflow RNASEQ {
             .mix(BAM_DEDUP_UMI_HISAT2.out.multiqc_files)
 
         //
-        // MODULE: Custom MultiQC plot — transcriptome BAM deduplication rate
+        // MODULE: Custom MultiQC plot — genome BAM deduplication rate
         //
         MULTIQC_CUSTOM_DEDUP_HISAT2 (
-            BAM_DEDUP_UMI_HISAT2.out.transcriptome_dedup_log,
-            ch_dedup_transcriptome_header_mqc
+            BAM_DEDUP_UMI_HISAT2.out.dedup_log,
+            ch_dedup_genome_header_mqc
         )
         ch_multiqc_files = ch_multiqc_files.mix(MULTIQC_CUSTOM_DEDUP_HISAT2.out.tsv.collect{it[1]})
         ch_versions = ch_versions.mix(MULTIQC_CUSTOM_DEDUP_HISAT2.out.versions.first())

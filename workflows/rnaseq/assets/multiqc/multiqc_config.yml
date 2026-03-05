@@ -44,7 +44,7 @@ report_section_order:
     order: 3000
   umitools:
     order: 3000
-  umi_dedup_transcriptome-module:
+  umi_dedup_genome-module:
     order: 2999
   biotype_counts_quantification_star_salmon-module:
     order: 1998

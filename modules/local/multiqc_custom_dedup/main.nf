@@ -91,7 +91,7 @@ dup_reads = reads_in - reads_out
 with open(header) as fh:
     header_text = fh.read()
 
-out_file = prefix + '.umi_dedup_transcriptome_mqc.tsv'
+out_file = prefix + '.umi_dedup_genome_mqc.tsv'
 with open(out_file, 'w') as fh:
     fh.write(header_text)
     fh.write('Sample\\tUnique reads\\tDuplicate reads\\n')
@@ -107,7 +107,7 @@ END_VERSIONS
     stub:
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    touch ${prefix}.umi_dedup_transcriptome_mqc.tsv
+    touch ${prefix}.umi_dedup_genome_mqc.tsv
 
     cat <<END_VERSIONS > versions.yml
     "${task.process}":

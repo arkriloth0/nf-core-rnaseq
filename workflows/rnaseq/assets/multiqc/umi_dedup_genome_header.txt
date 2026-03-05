@@ -1,0 +1,17 @@
+# id: 'umi_dedup_genome'
+# section_name: 'UMI Deduplication Rate (Genome BAM)'
+# description: >
+#     Unique and duplicate reads after UMI-based deduplication of the <b>genome BAM</b>.
+#     Only shown for samples processed with <code>--with_umi</code>.
+# plot_type: 'bargraph'
+# anchor: 'umi_dedup_genome'
+# pconfig:
+#     id: 'umi_dedup_genome_plot'
+#     title: 'UMI Deduplication: Genome BAM'
+#     cpswitch_counts_label: 'Number of Reads'
+#     hide_zero_cats: false
+#     categories:
+#         Unique reads:
+#             colour: '#7fc97f'
+#         Duplicate reads:
+#             colour: '#beaed4'
