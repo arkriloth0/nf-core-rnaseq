@@ -1,5 +1,5 @@
 process MULTIQC_CUSTOM_DEDUP {
-    tag "$meta.id"
+    label "process_single"
 
     conda "${moduleDir}/environment.yml"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
@@ -7,26 +7,25 @@ process MULTIQC_CUSTOM_DEDUP {
         'biocontainers/python:3.9--1' }"
 
     input:
-    tuple val(meta), path(dedup_log)
-    path  header
+    path dedup_logs
+    path header
 
     output:
-    tuple val(meta), path("*.tsv"), emit: tsv
-    path "versions.yml"           , emit: versions
+    path "*.tsv"       , emit: tsv
+    path "versions.yml", emit: versions
 
     when:
     task.ext.when == null || task.ext.when
 
     script:
-    def prefix = task.ext.prefix ?: "${meta.id}"
     """
     python3 - << 'PYEOF'
-import re, sys
+import glob, os, re, sys
 
-log_file  = '${dedup_log}'
-sample_id = '${meta.id}'
-prefix    = '${prefix}'
 header    = '${header}'
+log_files = glob.glob('*_dedup*.log') + glob.glob('*.dedup*.log')
+if not log_files:
+    log_files = [f for f in os.listdir('.') if f.endswith('.log')]
 
 
 def parse_umitools_log(content):
@@ -71,31 +70,42 @@ def parse_umicollapse_log(content):
     return reads_in, reads_out
 
 
-with open(log_file) as fh:
-    content = fh.read()
+def sample_id_from_filename(fname):
+    name = os.path.basename(fname)
+    name = re.sub(r'\\.umi_dedup\\..*', '', name)
+    name = re.sub(r'\\.log\$', '', name)
+    return name
 
-if '_UMICollapse.log' in log_file:
-    reads_in, reads_out = parse_umicollapse_log(content)
-else:
-    reads_in, reads_out = parse_umitools_log(content)
-
-if reads_in is None or reads_out is None:
-    sys.exit(
-        'ERROR: Could not parse reads_in (' + str(reads_in) + ') or reads_out ('
-        + str(reads_out) + ') from ' + log_file
-        + '. Please report this at https://github.com/nf-core/rnaseq/issues'
-    )
-
-dup_reads = reads_in - reads_out
 
 with open(header) as fh:
     header_text = fh.read()
 
-out_file = prefix + '.umi_dedup_genome_mqc.tsv'
-with open(out_file, 'w') as fh:
+rows = []
+for log_file in sorted(log_files):
+    with open(log_file) as fh:
+        content = fh.read()
+
+    if '_UMICollapse.log' in log_file:
+        reads_in, reads_out = parse_umicollapse_log(content)
+    else:
+        reads_in, reads_out = parse_umitools_log(content)
+
+    if reads_in is None or reads_out is None:
+        sys.exit(
+            'ERROR: Could not parse reads_in (' + str(reads_in) + ') or reads_out ('
+            + str(reads_out) + ') from ' + log_file
+            + '. Please report this at https://github.com/nf-core/rnaseq/issues'
+        )
+
+    sample_id = sample_id_from_filename(log_file)
+    dup_reads = reads_in - reads_out
+    rows.append(sample_id + '\\t' + str(reads_out) + '\\t' + str(dup_reads))
+
+with open('umi_dedup_genome_mqc.tsv', 'w') as fh:
     fh.write(header_text)
     fh.write('Sample\\tUnique reads\\tDuplicate reads\\n')
-    fh.write(sample_id + '\\t' + str(reads_out) + '\\t' + str(dup_reads) + '\\n')
+    for row in rows:
+        fh.write(row + '\\n')
 PYEOF
 
     cat <<END_VERSIONS > versions.yml
@@ -105,9 +115,8 @@ END_VERSIONS
     """
 
     stub:
-    def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    touch ${prefix}.umi_dedup_genome_mqc.tsv
+    touch umi_dedup_genome_mqc.tsv
 
     cat <<END_VERSIONS > versions.yml
     "${task.process}":

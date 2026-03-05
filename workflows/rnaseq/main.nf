@@ -283,11 +283,11 @@ workflow RNASEQ {
         // MODULE: Custom MultiQC plot — genome BAM deduplication rate
         //
         MULTIQC_CUSTOM_DEDUP_STAR (
-            BAM_DEDUP_UMI_STAR.out.dedup_log,
+            BAM_DEDUP_UMI_STAR.out.dedup_log.collect{it[1]},
             ch_dedup_genome_header_mqc
         )
-        ch_multiqc_files = ch_multiqc_files.mix(MULTIQC_CUSTOM_DEDUP_STAR.out.tsv.collect{it[1]})
-        ch_versions = ch_versions.mix(MULTIQC_CUSTOM_DEDUP_STAR.out.versions.first())
+        ch_multiqc_files = ch_multiqc_files.mix(MULTIQC_CUSTOM_DEDUP_STAR.out.tsv)
+        ch_versions = ch_versions.mix(MULTIQC_CUSTOM_DEDUP_STAR.out.versions)
 
         // For non-UMI samples when markdups is skipped, add aligner stats to MultiQC
         if (params.skip_markduplicates) {
@@ -439,11 +439,11 @@ workflow RNASEQ {
         // MODULE: Custom MultiQC plot — genome BAM deduplication rate
         //
         MULTIQC_CUSTOM_DEDUP_HISAT2 (
-            BAM_DEDUP_UMI_HISAT2.out.dedup_log,
+            BAM_DEDUP_UMI_HISAT2.out.dedup_log.collect{it[1]},
             ch_dedup_genome_header_mqc
         )
-        ch_multiqc_files = ch_multiqc_files.mix(MULTIQC_CUSTOM_DEDUP_HISAT2.out.tsv.collect{it[1]})
-        ch_versions = ch_versions.mix(MULTIQC_CUSTOM_DEDUP_HISAT2.out.versions.first())
+        ch_multiqc_files = ch_multiqc_files.mix(MULTIQC_CUSTOM_DEDUP_HISAT2.out.tsv)
+        ch_versions = ch_versions.mix(MULTIQC_CUSTOM_DEDUP_HISAT2.out.versions)
 
         // For non-UMI samples when markdups is skipped, add aligner stats to MultiQC
         if (params.skip_markduplicates) {
