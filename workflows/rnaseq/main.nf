@@ -11,6 +11,11 @@ include { DESEQ2_QC as DESEQ2_QC_STAR_SALMON } from '../../modules/local/deseq2_
 include { DESEQ2_QC as DESEQ2_QC_RSEM        } from '../../modules/local/deseq2_qc'
 include { DESEQ2_QC as DESEQ2_QC_PSEUDO      } from '../../modules/local/deseq2_qc'
 include { MULTIQC_CUSTOM_BIOTYPE             } from '../../modules/local/multiqc_custom_biotype'
+include { MULTIQC_CUSTOM_DEDUP as MULTIQC_CUSTOM_DEDUP_STAR   } from '../../modules/local/multiqc_custom_dedup'
+include { MULTIQC_CUSTOM_DEDUP as MULTIQC_CUSTOM_DEDUP_HISAT2 } from '../../modules/local/multiqc_custom_dedup'
+include { MULTIQC_BIOTYPE_COUNTS_QUANTIFICATION as MULTIQC_BIOTYPE_COUNTS_STAR_SALMON } from '../../modules/local/multiqc_biotype_counts_quantification'
+include { MULTIQC_BIOTYPE_COUNTS_QUANTIFICATION as MULTIQC_BIOTYPE_COUNTS_RSEM        } from '../../modules/local/multiqc_biotype_counts_quantification'
+include { MULTIQC_BIOTYPE_COUNTS_QUANTIFICATION as MULTIQC_BIOTYPE_COUNTS_PSEUDO      } from '../../modules/local/multiqc_biotype_counts_quantification'
 
 //
 // SUBWORKFLOW: Consisting of a mix of local and nf-core/modules
@@ -72,11 +77,12 @@ include { FASTQ_QC_TRIM_FILTER_SETSTRANDEDNESS              } from '../../subwor
 */
 
 // Header files for MultiQC
-ch_pca_header_multiqc           = file("$projectDir/workflows/rnaseq/assets/multiqc/deseq2_pca_header.txt", checkIfExists: true)
-sample_status_header_multiqc    = file("$projectDir/workflows/rnaseq/assets/multiqc/sample_status_header.txt", checkIfExists: true)
-ch_clustering_header_multiqc    = file("$projectDir/workflows/rnaseq/assets/multiqc/deseq2_clustering_header.txt", checkIfExists: true)
-ch_biotypes_header_multiqc      = file("$projectDir/workflows/rnaseq/assets/multiqc/biotypes_header.txt", checkIfExists: true)
-ch_dummy_file                   = ch_pca_header_multiqc
+ch_pca_header_multiqc              = file("$projectDir/workflows/rnaseq/assets/multiqc/deseq2_pca_header.txt", checkIfExists: true)
+sample_status_header_multiqc       = file("$projectDir/workflows/rnaseq/assets/multiqc/sample_status_header.txt", checkIfExists: true)
+ch_clustering_header_multiqc       = file("$projectDir/workflows/rnaseq/assets/multiqc/deseq2_clustering_header.txt", checkIfExists: true)
+ch_biotypes_header_multiqc         = file("$projectDir/workflows/rnaseq/assets/multiqc/biotypes_header.txt", checkIfExists: true)
+ch_dedup_transcriptome_header_mqc  = file("$projectDir/workflows/rnaseq/assets/multiqc/umi_dedup_transcriptome_header.txt", checkIfExists: true)
+ch_dummy_file                      = ch_pca_header_multiqc
 
 workflow RNASEQ {
 
@@ -273,6 +279,16 @@ workflow RNASEQ {
         ch_multiqc_files = ch_multiqc_files
             .mix(BAM_DEDUP_UMI_STAR.out.multiqc_files)
 
+        //
+        // MODULE: Custom MultiQC plot — transcriptome BAM deduplication rate
+        //
+        MULTIQC_CUSTOM_DEDUP_STAR (
+            BAM_DEDUP_UMI_STAR.out.transcriptome_dedup_log,
+            ch_dedup_transcriptome_header_mqc
+        )
+        ch_multiqc_files = ch_multiqc_files.mix(MULTIQC_CUSTOM_DEDUP_STAR.out.tsv.collect{it[1]})
+        ch_versions = ch_versions.mix(MULTIQC_CUSTOM_DEDUP_STAR.out.versions.first())
+
         // For non-UMI samples when markdups is skipped, add aligner stats to MultiQC
         if (params.skip_markduplicates) {
             // The deduplicated stats should take priority for MultiQC, but use
@@ -307,6 +323,21 @@ workflow RNASEQ {
             ch_versions = ch_versions.mix(DESEQ2_QC_RSEM.out.versions)
         }
 
+        //
+        // MODULE: Gene biotype breakdown from RSEM quantification
+        //
+        if (!params.skip_qc && !params.skip_biotype_qc && (params.gencode ? "gene_type" : params.featurecounts_group_type)) {
+            MULTIQC_BIOTYPE_COUNTS_RSEM (
+                QUANTIFY_RSEM.out.merged_counts_gene,
+                ch_gtf,
+                'rsem',
+                params.gencode ? 'gene_type' : params.featurecounts_group_type,
+                5
+            )
+            ch_multiqc_files = ch_multiqc_files.mix(MULTIQC_BIOTYPE_COUNTS_RSEM.out.tsv.collect())
+            ch_versions = ch_versions.mix(MULTIQC_BIOTYPE_COUNTS_RSEM.out.versions)
+        }
+
     } else if (params.aligner == 'star_salmon') {
 
         //
@@ -337,6 +368,21 @@ workflow RNASEQ {
             ch_multiqc_files = ch_multiqc_files.mix(DESEQ2_QC_STAR_SALMON.out.pca_multiqc.collect())
             ch_multiqc_files = ch_multiqc_files.mix(DESEQ2_QC_STAR_SALMON.out.dists_multiqc.collect())
             ch_versions = ch_versions.mix(DESEQ2_QC_STAR_SALMON.out.versions)
+        }
+
+        //
+        // MODULE: Gene biotype breakdown from STAR + Salmon quantification
+        //
+        if (!params.skip_qc && !params.skip_biotype_qc && (params.gencode ? "gene_type" : params.featurecounts_group_type)) {
+            MULTIQC_BIOTYPE_COUNTS_STAR_SALMON (
+                QUANTIFY_STAR_SALMON.out.counts_gene.map { it[1] },
+                ch_gtf,
+                'star_salmon',
+                params.gencode ? 'gene_type' : params.featurecounts_group_type,
+                5
+            )
+            ch_multiqc_files = ch_multiqc_files.mix(MULTIQC_BIOTYPE_COUNTS_STAR_SALMON.out.tsv.collect())
+            ch_versions = ch_versions.mix(MULTIQC_BIOTYPE_COUNTS_STAR_SALMON.out.versions)
         }
     }
 
@@ -388,6 +434,16 @@ workflow RNASEQ {
 
         ch_multiqc_files = ch_multiqc_files
             .mix(BAM_DEDUP_UMI_HISAT2.out.multiqc_files)
+
+        //
+        // MODULE: Custom MultiQC plot — transcriptome BAM deduplication rate
+        //
+        MULTIQC_CUSTOM_DEDUP_HISAT2 (
+            BAM_DEDUP_UMI_HISAT2.out.transcriptome_dedup_log,
+            ch_dedup_transcriptome_header_mqc
+        )
+        ch_multiqc_files = ch_multiqc_files.mix(MULTIQC_CUSTOM_DEDUP_HISAT2.out.tsv.collect{it[1]})
+        ch_versions = ch_versions.mix(MULTIQC_CUSTOM_DEDUP_HISAT2.out.versions.first())
 
         // For non-UMI samples when markdups is skipped, add aligner stats to MultiQC
         if (params.skip_markduplicates) {
@@ -742,6 +798,21 @@ workflow RNASEQ {
             ch_multiqc_files = ch_multiqc_files.mix(DESEQ2_QC_PSEUDO.out.pca_multiqc.collect())
             ch_multiqc_files = ch_multiqc_files.mix(DESEQ2_QC_PSEUDO.out.dists_multiqc.collect())
             ch_versions = ch_versions.mix(DESEQ2_QC_PSEUDO.out.versions)
+        }
+
+        //
+        // MODULE: Gene biotype breakdown from pseudo-aligner quantification
+        //
+        if (!params.skip_qc && !params.skip_biotype_qc && (params.gencode ? "gene_type" : params.featurecounts_group_type)) {
+            MULTIQC_BIOTYPE_COUNTS_PSEUDO (
+                QUANTIFY_PSEUDO_ALIGNMENT.out.counts_gene.map { it[1] },
+                ch_gtf,
+                params.pseudo_aligner,
+                params.gencode ? 'gene_type' : params.featurecounts_group_type,
+                5
+            )
+            ch_multiqc_files = ch_multiqc_files.mix(MULTIQC_BIOTYPE_COUNTS_PSEUDO.out.tsv.collect())
+            ch_versions = ch_versions.mix(MULTIQC_BIOTYPE_COUNTS_PSEUDO.out.versions)
         }
     }
 

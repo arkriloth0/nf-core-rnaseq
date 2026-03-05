@@ -44,6 +44,16 @@ report_section_order:
     order: 3000
   umitools:
     order: 3000
+  umi_dedup_transcriptome-module:
+    order: 2999
+  biotype_counts_quantification_star_salmon-module:
+    order: 1998
+  biotype_counts_quantification_rsem-module:
+    order: 1997
+  biotype_counts_quantification_salmon-module:
+    order: 1996
+  biotype_counts_quantification_kallisto-module:
+    order: 1995
   # Quantification
   rsem:
     order: 2000
@@ -218,6 +228,7 @@ sp:
 
 fn_ignore_files:
   - "*umi_dedup.transcriptome.sorted.log"
+  - "*umi_dedup.transcriptome.sorted_UMICollapse.log"
 
 # See https://github.com/ewels/MultiQC_TestData/blob/master/data/custom_content/with_config/table_headerconfig/multiqc_config.yaml
 custom_data:
