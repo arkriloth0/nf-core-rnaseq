@@ -149,19 +149,19 @@ with open(out_file, 'w') as fh:
     fh.write("\\n".join(lines) + "\\n")
 PYEOF
 
-    cat <<-END_VERSIONS > versions.yml
+    cat <<END_VERSIONS > versions.yml
     "${task.process}":
         python: \$(python --version | sed 's/Python //g')
-    END_VERSIONS
+END_VERSIONS
     """
 
     stub:
     """
     touch biotype_counts_quantification_${quant_label}_mqc.tsv
 
-    cat <<-END_VERSIONS > versions.yml
+    cat <<END_VERSIONS > versions.yml
     "${task.process}":
         python: \$(python --version | sed 's/Python //g')
-    END_VERSIONS
+END_VERSIONS
     """
 }
