@@ -125,10 +125,16 @@ parse_metadata <- function(metadata_path, ids, metadata_id_col = NULL){
     metadata <-  metadata[, colSums(is.na(metadata)) != nrow(metadata)]
 
     # Allow for duplicate rows by the id column
+    # na.action = na.pass prevents aggregate() from dropping rows that contain
+    # NAs (which happens when samples have differing optional columns).
     metadata <- aggregate(
         . ~ metadata[[metadata_id_col]],
         data = metadata,
-        FUN = function(x) paste(unique(x), collapse = ",")
+        FUN = function(x) {
+            vals <- unique(x[!is.na(x)])
+            if (length(vals) == 0) NA_character_ else paste(vals, collapse = ",")
+        },
+        na.action = na.pass
     )[,-1]
 
     rownames(metadata) <- metadata[[metadata_id_col]]
