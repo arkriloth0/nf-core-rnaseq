@@ -69,13 +69,14 @@ if not gene_biotype:
 with open(counts_file) as fh:
     header_line = fh.readline().rstrip('\\n').split('\\t')
 
-# Detect RSEM format: second column is 'transcript_id(s)'
-if len(header_line) > 1 and header_line[1].lower().startswith('transcript_id'):
-    gene_col     = 0
-    sample_start = 2
-else:
-    gene_col     = 0
-    sample_start = 1
+# Skip metadata columns (gene_id, transcript_id(s), gene_name) to find sample start
+gene_col     = 0
+sample_start = 1
+for i in range(1, len(header_line)):
+    if header_line[i].lower() in ('transcript_id(s)', 'gene_name'):
+        sample_start = i + 1
+    else:
+        break
 
 sample_names = header_line[sample_start:]
 per_sample_biotype = {s: defaultdict(int) for s in sample_names}
