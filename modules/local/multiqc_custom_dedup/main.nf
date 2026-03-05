@@ -51,6 +51,12 @@ def parse_umicollapse_log(content):
             reads_in  = int(m.group(1).replace(',', ''))
             reads_out = int(m.group(2).replace(',', ''))
             break
+        m = re.search(r'Number of input reads\\s+([\\d,]+)', line, re.IGNORECASE)
+        if m and reads_in is None:
+            reads_in = int(m.group(1).replace(',', ''))
+        m = re.search(r'Number of reads after deduplicat\\w*\\s+([\\d,]+)', line, re.IGNORECASE)
+        if m and reads_out is None:
+            reads_out = int(m.group(1).replace(',', ''))
         m = re.search(r'Total input[^:]*:\\s*([\\d,]+)', line, re.IGNORECASE)
         if m and reads_in is None:
             reads_in = int(m.group(1).replace(',', ''))
