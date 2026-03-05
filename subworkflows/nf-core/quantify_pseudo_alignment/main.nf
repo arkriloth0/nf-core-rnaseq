@@ -33,6 +33,12 @@ workflow QUANTIFY_PSEUDO_ALIGNMENT {
     //
     // NOTE: MultiQC needs Salmon outputs, but Kallisto logs
     if (pseudo_aligner == 'salmon') {
+        reads
+            .filter { meta, fastq -> meta.noLengthCorrection }
+            .subscribe { meta, fastq ->
+                log.warn "[RNASEQ] Sample '${meta.id}': --noLengthCorrection is enabled — all bias correction flags (--seqBias, --gcBias, --posBias) have been disabled as they are incompatible with --noLengthCorrection."
+            }
+
         SALMON_QUANT (
             reads,
             index,
