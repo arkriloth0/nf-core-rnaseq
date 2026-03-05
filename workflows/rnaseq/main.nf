@@ -13,6 +13,7 @@ include { DESEQ2_QC as DESEQ2_QC_PSEUDO      } from '../../modules/local/deseq2_
 include { MULTIQC_CUSTOM_BIOTYPE             } from '../../modules/local/multiqc_custom_biotype'
 include { MULTIQC_CUSTOM_DEDUP as MULTIQC_CUSTOM_DEDUP_STAR   } from '../../modules/local/multiqc_custom_dedup'
 include { MULTIQC_CUSTOM_DEDUP as MULTIQC_CUSTOM_DEDUP_HISAT2 } from '../../modules/local/multiqc_custom_dedup'
+include { MULTIQC_CUSTOM_STAR_DEDUP                           } from '../../modules/local/multiqc_custom_star_dedup'
 include { MULTIQC_BIOTYPE_COUNTS_QUANTIFICATION as MULTIQC_BIOTYPE_COUNTS_STAR_SALMON } from '../../modules/local/multiqc_biotype_counts_quantification'
 include { MULTIQC_BIOTYPE_COUNTS_QUANTIFICATION as MULTIQC_BIOTYPE_COUNTS_RSEM        } from '../../modules/local/multiqc_biotype_counts_quantification'
 include { MULTIQC_BIOTYPE_COUNTS_QUANTIFICATION as MULTIQC_BIOTYPE_COUNTS_PSEUDO      } from '../../modules/local/multiqc_biotype_counts_quantification'
@@ -82,6 +83,7 @@ sample_status_header_multiqc       = file("$projectDir/workflows/rnaseq/assets/m
 ch_clustering_header_multiqc       = file("$projectDir/workflows/rnaseq/assets/multiqc/deseq2_clustering_header.txt", checkIfExists: true)
 ch_biotypes_header_multiqc         = file("$projectDir/workflows/rnaseq/assets/multiqc/biotypes_header.txt", checkIfExists: true)
 ch_dedup_genome_header_mqc         = file("$projectDir/workflows/rnaseq/assets/multiqc/umi_dedup_genome_header.txt", checkIfExists: true)
+ch_star_dedup_categories_header_mqc = file("$projectDir/workflows/rnaseq/assets/multiqc/star_dedup_categories_header.txt", checkIfExists: true)
 ch_dummy_file                      = ch_pca_header_multiqc
 
 workflow RNASEQ {
@@ -289,6 +291,18 @@ workflow RNASEQ {
         )
         ch_multiqc_files = ch_multiqc_files.mix(MULTIQC_CUSTOM_DEDUP_STAR.out.tsv)
         ch_versions = ch_versions.mix(MULTIQC_CUSTOM_DEDUP_STAR.out.versions)
+
+        //
+        // MODULE: Custom MultiQC plot — STAR alignment categories post-dedup
+        //
+        MULTIQC_CUSTOM_STAR_DEDUP (
+            ch_star_log.filter { meta, f -> meta.with_umi }.collect{it[1]},
+            ALIGN_STAR.out.flagstat.filter { meta, f -> meta.with_umi }.collect{it[1]},
+            BAM_DEDUP_UMI_STAR.out.genome_flagstat.collect{it[1]},
+            ch_star_dedup_categories_header_mqc
+        )
+        ch_multiqc_files = ch_multiqc_files.mix(MULTIQC_CUSTOM_STAR_DEDUP.out.tsv)
+        ch_versions = ch_versions.mix(MULTIQC_CUSTOM_STAR_DEDUP.out.versions)
 
         // For non-UMI samples when markdups is skipped, add aligner stats to MultiQC
         if (params.skip_markduplicates) {

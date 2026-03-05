@@ -1,0 +1,28 @@
+# id: 'star_dedup_categories'
+# section_name: 'STAR Alignment Categories (Post-Dedup)'
+# description: >
+#     Breakdown of STAR alignment categories after UMI-based deduplication.
+#     Uniquely mapped reads are split into unique (retained) and duplicate (removed) fractions.
+#     Only shown for samples processed with <code>--with_umi</code>.
+# plot_type: 'bargraph'
+# anchor: 'star_dedup_categories'
+# pconfig:
+#     id: 'star_dedup_categories_plot'
+#     title: 'STAR Alignment Categories (Post-Dedup)'
+#     cpswitch_counts_label: 'Number of Reads'
+#     hide_zero_cats: false
+#     categories:
+#         Uniquely mapped (unique):
+#             colour: '#437bb1'
+#         Uniquely mapped (duplicates):
+#             colour: '#7cb5ec'
+#         Mapped to multiple loci:
+#             colour: '#f7a35c'
+#         Mapped to too many loci:
+#             colour: '#e63491'
+#         Unmapped (too many mismatches):
+#             colour: '#b1084c'
+#         Unmapped (too short):
+#             colour: '#7f0000'
+#         Unmapped (other):
+#             colour: '#868686'

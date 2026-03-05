@@ -46,6 +46,8 @@ report_section_order:
     order: 3000
   umi_dedup_genome-module:
     order: 2999
+  star_dedup_categories-module:
+    order: 2998
   biotype_counts_quantification_star_salmon-module:
     order: 1998
   biotype_counts_quantification_rsem-module:
