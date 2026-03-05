@@ -36,8 +36,9 @@ def parse_primary_mapped(flagstat_file):
 
 def sample_id_from_flagstat(fname):
     name = os.path.basename(fname)
-    name = re.sub(r'\\.sorted\\.bam\\.flagstat', '', name)
     name = re.sub(r'\\.flagstat', '', name)
+    name = re.sub(r'\\.sorted\\.bam', '', name)
+    name = re.sub(r'\\.umi_dedup', '', name)
     return name
 
 
