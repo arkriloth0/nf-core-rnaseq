@@ -177,13 +177,12 @@ workflow FASTQ_QC_TRIM_FILTER_SETSTRANDEDNESS {
     //
     if (trimmer == 'fastp') {
         FASTQ_FASTQC_UMITOOLS_FASTP(
-            ch_filtered_reads,
+            ch_filtered_reads.map { meta, reads -> [meta, reads, []] },
             skip_fastqc,
             with_umi,
             skip_umi_extract,
             umi_discard_read,
             skip_trimming,
-            [],
             save_trimmed,
             fastp_merge,
             min_trimmed_reads,
@@ -191,7 +190,6 @@ workflow FASTQ_QC_TRIM_FILTER_SETSTRANDEDNESS {
         ch_filtered_reads = FASTQ_FASTQC_UMITOOLS_FASTP.out.reads
         ch_trim_read_count = FASTQ_FASTQC_UMITOOLS_FASTP.out.trim_read_count
 
-        ch_versions = ch_versions.mix(FASTQ_FASTQC_UMITOOLS_FASTP.out.versions)
         ch_multiqc_files = FASTQ_FASTQC_UMITOOLS_FASTP.out.fastqc_raw_zip
             .mix(FASTQ_FASTQC_UMITOOLS_FASTP.out.fastqc_trim_zip)
             .mix(FASTQ_FASTQC_UMITOOLS_FASTP.out.trim_json)
