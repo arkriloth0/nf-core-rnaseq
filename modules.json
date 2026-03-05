@@ -47,12 +47,12 @@
                     },
                     "fastp": {
                         "branch": "master",
-                        "git_sha": "8864afe586537bf562eac7b83349c26207f3cb4d",
+                        "git_sha": "a331ecfd1aa48b2b2298aab23bb4516c800e410b",
                         "installed_by": ["fastq_fastqc_umitools_fastp", "modules"]
                     },
                     "fastqc": {
                         "branch": "master",
-                        "git_sha": "41dfa3f7c0ffabb96a6a813fe321c6d1cc5b6e46",
+                        "git_sha": "3009f27c4e4b6e99da4eeebe82799e13924a4a1f",
                         "installed_by": ["fastq_fastqc_umitools_fastp", "fastq_fastqc_umitools_trimgalore"]
                     },
                     "fq/lint": {
@@ -264,7 +264,7 @@
                     },
                     "trimgalore": {
                         "branch": "master",
-                        "git_sha": "05954dab2ff481bcb999f24455da29a5828af08d",
+                        "git_sha": "eed5d14302a6c9070dcc25feeab707a27a4b3254",
                         "installed_by": ["fastq_fastqc_umitools_trimgalore"]
                     },
                     "tximeta/tximport": {
@@ -295,7 +295,7 @@
                     },
                     "umitools/extract": {
                         "branch": "master",
-                        "git_sha": "05954dab2ff481bcb999f24455da29a5828af08d",
+                        "git_sha": "bd6d730b3f32742f402189113ba9480006a3350f",
                         "installed_by": ["fastq_fastqc_umitools_fastp", "fastq_fastqc_umitools_trimgalore", "modules"],
                         "patch": "modules/nf-core/umitools/extract/umitools-extract.diff"
                     },
@@ -366,12 +366,12 @@
                     },
                     "fastq_fastqc_umitools_fastp": {
                         "branch": "master",
-                        "git_sha": "db5a84497b80c4932b4498ec231f19403d19bcff",
+                        "git_sha": "8f2ec534d0418bf724cfd5f053176a9c500fae78",
                         "installed_by": ["fastq_qc_trim_filter_setstrandedness", "subworkflows"]
                     },
                     "fastq_fastqc_umitools_trimgalore": {
                         "branch": "master",
-                        "git_sha": "f232063fa5ecf4837df2da7db7857b5ddd62a3d5",
+                        "git_sha": "8f2ec534d0418bf724cfd5f053176a9c500fae78",
                         "installed_by": ["fastq_qc_trim_filter_setstrandedness", "subworkflows"]
                     },
                     "fastq_qc_trim_filter_setstrandedness": {
