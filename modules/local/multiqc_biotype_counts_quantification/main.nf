@@ -39,18 +39,21 @@ min_count    = int('${min_count}')
 gene_biotype = {}
 attr_re = re.compile(r'%s\\s+"([^"]+)"' % re.escape(biotype_attr))
 
-with open(gtf_file) as fh:
-    for line in fh:
-        if line.startswith('#'):
-            continue
-        fields = line.rstrip('\\n').split('\\t')
-        if len(fields) < 9 or fields[2] != 'gene':
-            continue
-        attrs = fields[8]
-        gid_m = re.search(r'gene_id\\s+"([^"]+)"', attrs)
-        bio_m = attr_re.search(attrs)
-        if gid_m and bio_m:
-            gene_biotype[gid_m.group(1)] = bio_m.group(1)
+for feature_type in ('gene', 'transcript'):
+    with open(gtf_file) as fh:
+        for line in fh:
+            if line.startswith('#'):
+                continue
+            fields = line.rstrip('\\n').split('\\t')
+            if len(fields) < 9 or fields[2] != feature_type:
+                continue
+            attrs = fields[8]
+            gid_m = re.search(r'gene_id\\s+"([^"]+)"', attrs)
+            bio_m = attr_re.search(attrs)
+            if gid_m and bio_m:
+                gene_biotype.setdefault(gid_m.group(1), bio_m.group(1))
+    if gene_biotype:
+        break
 
 if not gene_biotype:
     sys.exit(
