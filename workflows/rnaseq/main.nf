@@ -13,7 +13,7 @@ include { DESEQ2_QC as DESEQ2_QC_PSEUDO      } from '../../modules/local/deseq2_
 include { MULTIQC_CUSTOM_BIOTYPE             } from '../../modules/local/multiqc_custom_biotype'
 include { MULTIQC_CUSTOM_DEDUP as MULTIQC_CUSTOM_DEDUP_STAR   } from '../../modules/local/multiqc_custom_dedup'
 include { MULTIQC_CUSTOM_DEDUP as MULTIQC_CUSTOM_DEDUP_HISAT2 } from '../../modules/local/multiqc_custom_dedup'
-include { MULTIQC_CUSTOM_STAR_DEDUP                           } from '../../modules/local/multiqc_custom_star_dedup'
+include { MULTIQC_CUSTOM_POSTDEDUP_CATEGORIES                  } from '../../modules/local/multiqc_custom_postdedup_categories'
 include { MULTIQC_BIOTYPE_COUNTS_QUANTIFICATION as MULTIQC_BIOTYPE_COUNTS_STAR_SALMON } from '../../modules/local/multiqc_biotype_counts_quantification'
 include { MULTIQC_BIOTYPE_COUNTS_QUANTIFICATION as MULTIQC_BIOTYPE_COUNTS_RSEM        } from '../../modules/local/multiqc_biotype_counts_quantification'
 include { MULTIQC_BIOTYPE_COUNTS_QUANTIFICATION as MULTIQC_BIOTYPE_COUNTS_PSEUDO      } from '../../modules/local/multiqc_biotype_counts_quantification'
@@ -293,16 +293,14 @@ workflow RNASEQ {
         ch_versions = ch_versions.mix(MULTIQC_CUSTOM_DEDUP_STAR.out.versions)
 
         //
-        // MODULE: Custom MultiQC plot — STAR alignment categories post-dedup
+        // MODULE: Custom MultiQC plot — alignment categories post-dedup
         //
-        MULTIQC_CUSTOM_STAR_DEDUP (
-            ch_star_log.filter { meta, f -> meta.with_umi }.collect{it[1]},
-            ALIGN_STAR.out.flagstat.filter { meta, f -> meta.with_umi }.collect{it[1]},
+        MULTIQC_CUSTOM_POSTDEDUP_CATEGORIES (
             BAM_DEDUP_UMI_STAR.out.genome_flagstat.collect{it[1]},
             ch_star_dedup_categories_header_mqc
         )
-        ch_multiqc_files = ch_multiqc_files.mix(MULTIQC_CUSTOM_STAR_DEDUP.out.tsv)
-        ch_versions = ch_versions.mix(MULTIQC_CUSTOM_STAR_DEDUP.out.versions)
+        ch_multiqc_files = ch_multiqc_files.mix(MULTIQC_CUSTOM_POSTDEDUP_CATEGORIES.out.tsv)
+        ch_versions = ch_versions.mix(MULTIQC_CUSTOM_POSTDEDUP_CATEGORIES.out.versions)
 
         // For non-UMI samples when markdups is skipped, add aligner stats to MultiQC
         if (params.skip_markduplicates) {
