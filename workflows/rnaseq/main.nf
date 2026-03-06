@@ -372,6 +372,7 @@ workflow RNASEQ {
             params.kallisto_quant_fraglen_sd
         )
         ch_versions = ch_versions.mix(QUANTIFY_STAR_SALMON.out.versions)
+        ch_multiqc_files = ch_multiqc_files.mix(QUANTIFY_STAR_SALMON.out.multiqc.collect{it[1]})
 
         if (!params.skip_qc & !params.skip_deseq2_qc) {
             DESEQ2_QC_STAR_SALMON (
