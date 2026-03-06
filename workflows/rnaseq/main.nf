@@ -296,7 +296,8 @@ workflow RNASEQ {
         // MODULE: Custom MultiQC plot — alignment categories post-dedup
         //
         MULTIQC_CUSTOM_POSTDEDUP_CATEGORIES (
-            BAM_DEDUP_UMI_STAR.out.genome_flagstat.collect{it[1]},
+            BAM_DEDUP_UMI_STAR.out.bam.collect{it[1]},
+            BAM_DEDUP_UMI_STAR.out.bai.collect{it[1]},
             ch_star_dedup_categories_header_mqc
         )
         ch_multiqc_files = ch_multiqc_files.mix(MULTIQC_CUSTOM_POSTDEDUP_CATEGORIES.out.tsv)

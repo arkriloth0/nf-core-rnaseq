@@ -3,11 +3,12 @@ process MULTIQC_CUSTOM_POSTDEDUP_CATEGORIES {
 
     conda "${moduleDir}/environment.yml"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/python:3.9--1' :
-        'biocontainers/python:3.9--1' }"
+        'https://depot.galaxyproject.org/singularity/samtools:1.21--h50ea8bc_0' :
+        'biocontainers/samtools:1.21--h50ea8bc_0' }"
 
     input:
-    path post_flagstats, stageAs: 'post/*'
+    path bams, stageAs: 'bams/*'
+    path bais, stageAs: 'bams/*'
     path header
 
     output:
@@ -19,83 +20,46 @@ process MULTIQC_CUSTOM_POSTDEDUP_CATEGORIES {
 
     script:
     """
-    python3 - << 'PYEOF'
-import os, re, sys
+    #!/usr/bin/env bash
+    set -euo pipefail
 
+    # Build TSV from header
+    cp ${header} postdedup_categories_mqc.tsv
 
-def parse_flagstat(flagstat_file):
-    counts = {}
-    with open(flagstat_file) as fh:
-        for line in fh:
-            m = re.match(r'(\\d+)', line)
-            if not m:
-                continue
-            val = int(m.group(1))
-            if 'primary mapped' in line:
-                counts['primary_mapped'] = val
-            elif 'secondary' in line:
-                counts['secondary'] = val
-            elif 'supplementary' in line:
-                counts['supplementary'] = val
-    return counts
+    # Column header
+    printf 'Sample\\tUniquely mapped\\tMulti-mapped\\tUnmapped\\n' >> postdedup_categories_mqc.tsv
 
+    for bam in bams/*.bam; do
+        sample=\$(basename "\$bam" .bam | sed 's/\\.sorted\\.bam\$//; s/\\.umi_dedup//')
 
-def sample_id_from_flagstat(fname):
-    name = os.path.basename(fname)
-    name = re.sub(r'\\.flagstat', '', name)
-    name = re.sub(r'\\.sorted\\.bam', '', name)
-    name = re.sub(r'\\.umi_dedup', '', name)
-    return name
+        # Primary mapped with MAPQ=255 (STAR uniquely mapped)
+        unique=\$(samtools view -c -F 0x904 -q 255 "\$bam")
 
+        # Total primary mapped
+        total_primary=\$(samtools view -c -F 0x904 "\$bam")
 
-post_dir = 'post'
+        # Multi-mapped = primary mapped with MAPQ < 255
+        multi=\$(( total_primary - unique ))
 
-post_files = {sample_id_from_flagstat(f): os.path.join(post_dir, f)
-              for f in os.listdir(post_dir) if f.endswith('.flagstat')}
+        # Unmapped reads
+        unmapped=\$(samtools view -c -f 4 "\$bam")
 
-samples = sorted(post_files)
-if not samples:
-    sys.exit('ERROR: No flagstat files found in post-dedup directory.')
-
-with open('${header}') as fh:
-    header_text = fh.read()
-
-columns = [
-    'Primary mapped',
-    'Secondary',
-    'Supplementary',
-]
-
-rows = []
-for sample in samples:
-    counts = parse_flagstat(post_files[sample])
-    values = [
-        counts.get('primary_mapped', 0),
-        counts.get('secondary', 0),
-        counts.get('supplementary', 0),
-    ]
-    rows.append(sample + '\\t' + '\\t'.join(str(v) for v in values))
-
-with open('star_dedup_categories_mqc.tsv', 'w') as fh:
-    fh.write(header_text)
-    fh.write('Sample\\t' + '\\t'.join(columns) + '\\n')
-    for row in rows:
-        fh.write(row + '\\n')
-PYEOF
+        printf '%s\\t%s\\t%s\\t%s\\n' "\$sample" "\$unique" "\$multi" "\$unmapped" >> postdedup_categories_mqc.tsv
+    done
 
     cat <<END_VERSIONS > versions.yml
     "${task.process}":
-        python: \$(python --version | sed 's/Python //g')
+        samtools: \$(samtools --version | head -1 | sed 's/samtools //')
 END_VERSIONS
     """
 
     stub:
     """
-    touch star_dedup_categories_mqc.tsv
+    touch postdedup_categories_mqc.tsv
 
     cat <<END_VERSIONS > versions.yml
     "${task.process}":
-        python: \$(python --version | sed 's/Python //g')
+        samtools: \$(samtools --version | head -1 | sed 's/samtools //')
 END_VERSIONS
     """
 }

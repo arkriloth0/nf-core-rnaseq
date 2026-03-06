@@ -1,8 +1,8 @@
 # id: 'star_dedup_categories'
 # section_name: 'Alignment Categories (Post-Dedup)'
 # description: >
-#     Breakdown of alignment categories from the deduplicated genome BAM
-#     based on <code>samtools flagstat</code>.
+#     STAR alignment categories from the deduplicated genome BAM.
+#     Uniquely mapped reads have MAPQ=255 (STAR convention), multi-mapped have MAPQ&lt;255.
 #     Only shown for samples processed with <code>--with_umi</code>.
 # plot_type: 'bargraph'
 # anchor: 'star_dedup_categories'
@@ -12,9 +12,9 @@
 #     cpswitch_counts_label: 'Number of Reads'
 #     hide_zero_cats: false
 #     categories:
-#         Primary mapped:
+#         Uniquely mapped:
 #             colour: '#437bb1'
-#         Secondary:
+#         Multi-mapped:
 #             colour: '#f7a35c'
-#         Supplementary:
-#             colour: '#e63491'
+#         Unmapped:
+#             colour: '#7f0000'
